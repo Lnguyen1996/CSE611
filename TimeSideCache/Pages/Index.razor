@@ -1,0 +1,83 @@
+﻿@page "/"
+@using Microsoft.Extensions.Caching.Distributed
+@using System.Text
+@using Newtonsoft.Json
+@using TimeSideCache.Data
+@inject CacheContext CacheService
+<PageTitle>Cache</PageTitle>
+
+<MudTextField @bind-Value="Cache.Key" Label="Key" Variant="Variant.Filled"></MudTextField>
+<MudTextField @bind-Value="Cache.Value" Label="Value" Variant="Variant.Filled"></MudTextField>
+<MudTextField @bind-Value="time" Label="Cache life time in minute" InputType="InputType.Number" Variant="Variant.Filled"></MudTextField>
+
+
+<MudTextField @bind-Value="CacheResult" Label="Cache Result" ReadOnly=true Variant="Variant.Filled"></MudTextField>
+
+
+<MudButton OnClick="Save" Color="Color.Primary" Variant="Variant.Filled">
+    Save Cache
+</MudButton>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary"  OnClick="@(()=>GetCache(new CacheData{Key=Cache.Key}))">
+    Get Cache
+</MudButton>
+<MudTable Items="@Caches" Hover="true" Breakpoint="Breakpoint.Sm" LoadingProgressColor="Color.Info">
+    <HeaderContent>
+        <MudTh>Key</MudTh>
+        <MudTh>Cache time</MudTh>
+        <MudTh>Cache life time</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Nr">@context.Key</MudTd>
+        <MudTd DataLabel="Sign">@context.CacheDateTime</MudTd>
+        <MudTd DataLabel="Name">@context.CacheLifeTime</MudTd>
+        <MudTd><MudButton OnClick="@(()=>GetCache(@context))">Get Value</MudButton></MudTd>
+    </RowTemplate>
+</MudTable>
+@code{
+    protected List<CacheData> Caches { get; set; } = new();
+    protected CacheData Cache { get; set; } = new();
+    protected string CacheResult{ get; set; }
+    protected int time{ get; set; }
+    [Inject]  IDistributedCache distributedCache{ get; set; }
+    protected override void OnInitialized()
+    {
+        Caches = CacheService.CacheDatas.ToList();
+    }
+    protected async Task OnCacheSaved(CacheData cache)
+    {
+        cache.Value=Cache.Value;
+
+        var options = new DistributedCacheEntryOptions()
+            .SetSlidingExpiration(cache.CacheLifeTime);
+        await distributedCache.SetStringAsync(cache.Key, cache.Value, options);
+    }
+    protected async Task GetCache(CacheData data)
+    {
+        var redisCustomerList = await distributedCache.GetStringAsync(data.Key);
+
+
+        CacheResult = redisCustomerList ?? "No cache found";
+    }
+    protected async Task Save()
+    {
+        var view = new CacheData
+            {
+                Key = Cache.Key,
+                CacheDateTime = DateTime.Now,
+                CacheLifeTime = TimeSpan.FromMinutes(time)
+            };
+        await OnCacheSaved(view);
+
+        view.Value = "";
+
+        CacheService.CacheDatas.Add(view);
+
+        await CacheService.SaveChangesAsync();
+
+        Caches = CacheService.CacheDatas.ToList();
+
+    }
+}
+
