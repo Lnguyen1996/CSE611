@@ -38,8 +38,12 @@
 @code{
     protected List<CacheData> Caches { get; set; } = new();
     protected CacheData Cache { get; set; } = new();
+
+
     protected string CacheResult{ get; set; }
+
     protected int time{ get; set; }
+
     [Inject]  IDistributedCache distributedCache{ get; set; }
     protected override void OnInitialized()
     {
@@ -51,6 +55,7 @@
 
         var options = new DistributedCacheEntryOptions()
             .SetSlidingExpiration(cache.CacheLifeTime);
+
         await distributedCache.SetStringAsync(cache.Key, cache.Value, options);
     }
     protected async Task GetCache(CacheData data)
@@ -68,6 +73,7 @@
                 CacheDateTime = DateTime.Now,
                 CacheLifeTime = TimeSpan.FromMinutes(time)
             };
+
         await OnCacheSaved(view);
 
         view.Value = "";
